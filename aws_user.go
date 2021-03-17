@@ -35,7 +35,7 @@ func DoUser(myConfig aws.Config, myContext context.Context) {
 
 func AddAnUserToGroup(myConfig aws.Config, myContext context.Context, userName string, groupName string) (bool, error) {
 
-	isOk, isErr := doesGroupExist(myConfig, myContext, groupName)
+	isOk, isErr := DoesGroupExist(myConfig, myContext, groupName)
 	if isErr != nil {
 		log.Fatalf("Error: Unable to check Group '%v': %v\n", groupName, isErr)
 	}
@@ -57,14 +57,7 @@ func AddAnUserToGroup(myConfig aws.Config, myContext context.Context, userName s
 
 	}
 
-	iamClient := iam.NewFromConfig(myConfig)
-
-	iamInput := &iam.AddUserToGroupInput{
-		GroupName: &groupName,
-		UserName:  &userName,
-	}
-
-	_, lErr := iamClient.AddUserToGroup(myContext, iamInput)
+	_, lErr := GoAddUserToGroup(myConfig, myContext, userName, groupName)
 	if lErr != nil {
 		return false, lErr
 	}
@@ -72,14 +65,27 @@ func AddAnUserToGroup(myConfig aws.Config, myContext context.Context, userName s
 	return true, nil
 }
 
-func doesUserExist(myConfig aws.Config, myContext context.Context, userName string) (bool, error) {
-
+func GoAddUserToGroup(myConfig aws.Config, myContext context.Context, userName string, groupName string) (*iam.AddUserToGroupOutput, error) {
 	iamClient := iam.NewFromConfig(myConfig)
 
+	iamInput := &iam.AddUserToGroupInput{
+		GroupName: &groupName,
+		UserName:  &userName,
+	}
+
+	return iamClient.AddUserToGroup(myContext, iamInput)
+}
+
+func GoListUsers(myConfig aws.Config, myContext context.Context) (*iam.ListUsersOutput, error) {
+	iamClient := iam.NewFromConfig(myConfig)
 	iamInput := &iam.ListUsersInput{}
 
-	iamResp, lErr := iamClient.ListUsers(myContext, iamInput)
+	return iamClient.ListUsers(myContext, iamInput)
+}
 
+func DoesUserExist(myConfig aws.Config, myContext context.Context, userName string) (bool, error) {
+
+	iamResp, lErr := GoListUsers(myConfig, myContext)
 	if lErr != nil {
 		return false, lErr
 	}
@@ -94,9 +100,20 @@ func doesUserExist(myConfig aws.Config, myContext context.Context, userName stri
 	return false, nil
 }
 
+func GoCreateUser(myConfig aws.Config, myContext context.Context, userName string) (*iam.CreateUserOutput, error) {
+
+	iamClient := iam.NewFromConfig(myConfig)
+	iamInput := &iam.CreateUserInput{
+		UserName: &userName,
+	}
+
+	return iamClient.CreateUser(myContext, iamInput)
+
+}
+
 func CreateUser(myConfig aws.Config, myContext context.Context, userName string) (bool, error) {
 
-	isOk, isErr := doesUserExist(myConfig, myContext, userName)
+	isOk, isErr := DoesUserExist(myConfig, myContext, userName)
 	if isErr != nil {
 		return false, isErr
 	}
@@ -105,13 +122,7 @@ func CreateUser(myConfig aws.Config, myContext context.Context, userName string)
 		return true, nil
 	}
 
-	iamClient := iam.NewFromConfig(myConfig)
-
-	iamInput := &iam.CreateUserInput{
-		UserName: &userName,
-	}
-
-	_, lErr := iamClient.CreateUser(myContext, iamInput)
+	_, lErr := GoCreateUser(myConfig, myContext, userName)
 
 	if lErr != nil {
 		return false, lErr

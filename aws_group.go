@@ -11,13 +11,16 @@ func DoGroup(myConfig aws.Config, myContext context.Context) {
 
 }
 
-func doesGroupExist(myConfig aws.Config, myContext context.Context, groupName string) (bool, error) {
-
+func GoListGroups(myConfig aws.Config, myContext context.Context) (*iam.ListGroupsOutput, error) {
 	iamClient := iam.NewFromConfig(myConfig)
-
 	iamInput := &iam.ListGroupsInput{}
 
-	iamResp, lErr := iamClient.ListGroups(myContext, iamInput)
+	return iamClient.ListGroups(myContext, iamInput)
+}
+
+func DoesGroupExist(myConfig aws.Config, myContext context.Context, groupName string) (bool, error) {
+
+	iamResp, lErr := GoListGroups(myConfig, myContext)
 	if lErr != nil {
 		return false, lErr
 	}
@@ -31,16 +34,18 @@ func doesGroupExist(myConfig aws.Config, myContext context.Context, groupName st
 	return false, nil
 }
 
-func CreateGroup(myConfig aws.Config, myContext context.Context, groupName string) (bool, error) {
-
+func GoCreateGroup(myConfig aws.Config, myContext context.Context, groupName string) (*iam.CreateGroupOutput, error) {
 	iamClient := iam.NewFromConfig(myConfig)
-
 	iamInput := &iam.CreateGroupInput{
 		GroupName: &groupName,
 	}
 
-	_, lErr := iamClient.CreateGroup(myContext, iamInput)
+	return iamClient.CreateGroup(myContext, iamInput)
+}
 
+func CreateGroup(myConfig aws.Config, myContext context.Context, groupName string) (bool, error) {
+
+	_, lErr := GoCreateGroup(myConfig, myContext, groupName)
 	if lErr != nil {
 		return false, lErr
 	}
