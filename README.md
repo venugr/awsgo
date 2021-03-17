@@ -1,2 +1,2 @@
 # awsgo
-AWS SDK GOV2...awsgo
+AWS SDK GO-V2...awsgo
