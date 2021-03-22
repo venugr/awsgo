@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
@@ -14,6 +15,7 @@ func DoUser(myConfig aws.Config, myContext context.Context) {
 	fmt.Println("Info: In DoUser()....")
 
 	//*******************************************************************************
+	DisplayUsers(myConfig, myContext)
 	userName := "testuser1"
 	isOk, isErr := CreateUser(myConfig, myContext, userName)
 
@@ -24,7 +26,7 @@ func DoUser(myConfig aws.Config, myContext context.Context) {
 	if isOk {
 		log.Printf("Info: User '%v' is created/already present.\n", userName)
 	}
-
+	DisplayUsers(myConfig, myContext)
 	//*******************************************************************************
 	groupName := "testgrp1"
 	isOk, isErr = AddAnUserToGroup(myConfig, myContext, userName, groupName)
@@ -73,6 +75,50 @@ func DoUser(myConfig aws.Config, myContext context.Context) {
 		}
 
 	}
+
+	//*******************************************************************************
+	newUserName := "DellUser1"
+	isOk, isErr = ChangeUserName(myConfig, myContext, userName, newUserName)
+	if isErr != nil || !isOk {
+		if !strings.Contains(isErr.Error(), "EntityAlreadyExists") {
+			log.Fatalf("Error: Change user name: %v\n", isErr)
+		}
+	}
+	DisplayUsers(myConfig, myContext)
+
+	//*******************************************************************************
+	log.Println("\nDelete User....\n")
+	DeleteAnUserFromGroup(myConfig, myContext, newUserName, groupName)
+	isOk, isErr = DeleteUser(myConfig, myContext, newUserName)
+	if isErr != nil || !isOk {
+		log.Fatalf("Error: Delete user name: %v\n", isErr)
+	}
+	DisplayUsers(myConfig, myContext)
+}
+
+func DeleteAnUserFromGroup(myConfig aws.Config, myContext context.Context, userName string, groupName string) (bool, error) {
+	_, isErr := DoesGroupExist(myConfig, myContext, groupName)
+	if isErr != nil {
+		log.Fatalf("Error: Unable to check Group '%v': %v\n", groupName, isErr)
+	}
+
+	_, lErr := GoDeleteUserFromGroup(myConfig, myContext, userName, groupName)
+	if lErr != nil {
+		return false, lErr
+	}
+	return true, nil
+
+}
+
+func GoDeleteUserFromGroup(myConfig aws.Config, myContext context.Context, userName string, groupName string) (*iam.RemoveUserFromGroupOutput, error) {
+	iamClient := iam.NewFromConfig(myConfig)
+
+	iamInput := &iam.RemoveUserFromGroupInput{
+		GroupName: &groupName,
+		UserName:  &userName,
+	}
+
+	return iamClient.RemoveUserFromGroup(myContext, iamInput)
 }
 
 func AddAnUserToGroup(myConfig aws.Config, myContext context.Context, userName string, groupName string) (bool, error) {
@@ -116,6 +162,24 @@ func GoAddUserToGroup(myConfig aws.Config, myContext context.Context, userName s
 	}
 
 	return iamClient.AddUserToGroup(myContext, iamInput)
+}
+
+func DisplayUsers(myConfig aws.Config, myContext context.Context) (bool, error) {
+	iamResp, lErr := GoListUsers(myConfig, myContext)
+	if lErr != nil {
+		return false, lErr
+	}
+
+	log.Println("\n")
+	log.Println("---------------------")
+	log.Println("Users List")
+	log.Println("---------------------")
+	for _, user := range iamResp.Users {
+		log.Println(*user.UserName)
+	}
+	log.Println("---------------------")
+	log.Println()
+	return true, nil
 }
 
 func GoListUsers(myConfig aws.Config, myContext context.Context) (*iam.ListUsersOutput, error) {
@@ -268,4 +332,64 @@ func ListAccessKeysForUser(myConfig aws.Config, myContext context.Context, userN
 		accKeyStatus[*key.AccessKeyId] = string(key.Status)
 	}
 	return true, nil, accKeyStatus
+}
+
+func GoUpdateUser(myConfig aws.Config, myContext context.Context, userName string, newUserName string) (*iam.UpdateUserOutput, error) {
+
+	iamClient := iam.NewFromConfig(myConfig)
+	iamInput := &iam.UpdateUserInput{
+		UserName:    &userName,
+		NewUserName: &newUserName,
+	}
+
+	return iamClient.UpdateUser(myContext, iamInput)
+}
+
+func ChangeUserName(myConfig aws.Config, myContext context.Context, userName string, newUserName string) (bool, error) {
+
+	isOk, isErr := DoesUserExist(myConfig, myContext, userName)
+	if isErr != nil {
+		return false, isErr
+	}
+
+	if !isOk {
+		return false, nil
+	}
+
+	_, lErr := GoUpdateUser(myConfig, myContext, userName, newUserName)
+
+	if lErr != nil {
+		return false, lErr
+	}
+
+	return true, nil
+}
+
+func GoDeleteUser(myConfig aws.Config, myContext context.Context, userName string) (*iam.DeleteUserOutput, error) {
+
+	iamClient := iam.NewFromConfig(myConfig)
+	iamInput := &iam.DeleteUserInput{
+		UserName: &userName,
+	}
+
+	return iamClient.DeleteUser(myContext, iamInput)
+}
+
+func DeleteUser(myConfig aws.Config, myContext context.Context, userName string) (bool, error) {
+	isOk, isErr := DoesUserExist(myConfig, myContext, userName)
+	if isErr != nil {
+		return false, isErr
+	}
+
+	if !isOk {
+		return false, nil
+	}
+
+	_, lErr := GoDeleteUser(myConfig, myContext, userName)
+
+	if lErr != nil {
+		return false, lErr
+	}
+
+	return true, nil
 }

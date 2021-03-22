@@ -18,7 +18,7 @@ func main() {
 		log.Fatalf("Error: config error, %v", lErr)
 	}
 
-	DoUser(myConfig, myContext)
-
+	// DoUser(myConfig, myContext)
+	DoPolicy(myConfig, myContext)
 	fmt.Println()
 }
