@@ -68,7 +68,7 @@ func DoPolicy(myConfig aws.Config, myContext context.Context) {
 	log.Println("Waiting for 60 sec....")
 	time.Sleep(60 * time.Second)
 
-	isOk, isErr = DettachPolicyToAnUser(myConfig, myContext, policyArn, userName)
+	isOk, isErr = DettachPolicyFromAnUser(myConfig, myContext, policyArn, userName)
 	if isErr != nil {
 		log.Fatalf("Error: unable to dettach policy from user: %v", isErr)
 	}
@@ -87,10 +87,10 @@ func DoPolicy(myConfig aws.Config, myContext context.Context) {
 	}
 
 	if !isOk {
-		log.Fatalf("Error: policy '%v' is not delete.", policyName)
+		log.Fatalf("Error: policy '%v' is not deleted.", policyName)
 	}
 
-	log.Printf("Info: Policy is delete:'%v'", policyName)
+	log.Printf("Info: Policy is deleted:'%v'", policyName)
 
 }
 
@@ -252,7 +252,7 @@ func GoDettachUserPolicy(myConfig aws.Config, myContext context.Context, policyA
 	return iamClient.DetachUserPolicy(myContext, iamInput)
 }
 
-func DettachPolicyToAnUser(myConfig aws.Config, myContext context.Context, policyArn string, userName string) (bool, error) {
+func DettachPolicyFromAnUser(myConfig aws.Config, myContext context.Context, policyArn string, userName string) (bool, error) {
 
 	isOk, isErr := DoesUserExist(myConfig, myContext, userName)
 

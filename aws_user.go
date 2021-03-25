@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
@@ -15,9 +16,35 @@ func DoUser(myConfig aws.Config, myContext context.Context) {
 	fmt.Println("Info: In DoUser()....")
 
 	//*******************************************************************************
+	log.Println()
+	aliasName := "testaliasvenul"
+	log.Println("Account Alias....Create.")
+	isOk, isErr := CreateAccountAlias(myConfig, myContext, aliasName)
+
+	if isErr != nil || !isOk {
+		log.Fatalf("Error: unable to create alias '%v': %v", aliasName, isErr)
+	}
+
+	log.Printf("Info: account alias '%v' is created.", aliasName)
+
+	time.Sleep(10 * time.Second)
+
+	log.Println()
+	log.Println("Account Alias....Delete.")
+	isOk, isErr = DeleteAccountAlias(myConfig, myContext, aliasName)
+
+	if isErr != nil || !isOk {
+		log.Fatalf("Error: unable to delete alias '%v': %v", aliasName, isErr)
+	}
+
+	log.Printf("Info: account alias '%v' is deleted.", aliasName)
+
+	return
+
+	//*******************************************************************************
 	DisplayUsers(myConfig, myContext)
 	userName := "testuser1"
-	isOk, isErr := CreateUser(myConfig, myContext, userName)
+	isOk, isErr = CreateUser(myConfig, myContext, userName)
 
 	if isErr != nil {
 		log.Fatalf("Error: User Create: %v\n", isErr)
@@ -94,6 +121,7 @@ func DoUser(myConfig aws.Config, myContext context.Context) {
 		log.Fatalf("Error: Delete user name: %v\n", isErr)
 	}
 	DisplayUsers(myConfig, myContext)
+
 }
 
 func DeleteAnUserFromGroup(myConfig aws.Config, myContext context.Context, userName string, groupName string) (bool, error) {
@@ -387,6 +415,74 @@ func DeleteUser(myConfig aws.Config, myContext context.Context, userName string)
 
 	_, lErr := GoDeleteUser(myConfig, myContext, userName)
 
+	if lErr != nil {
+		return false, lErr
+	}
+
+	return true, nil
+}
+
+func GoCreateAccountAlias(myConfig aws.Config, myContext context.Context, aliasName string) (*iam.CreateAccountAliasOutput, error) {
+	iamClient := iam.NewFromConfig(myConfig)
+	iamInput := &iam.CreateAccountAliasInput{
+		AccountAlias: &aliasName,
+	}
+
+	return iamClient.CreateAccountAlias(myContext, iamInput)
+
+}
+
+func CreateAccountAlias(myConfig aws.Config, myContext context.Context, aliasName string) (bool, error) {
+
+	_, lErr := GoCreateAccountAlias(myConfig, myContext, aliasName)
+	if lErr != nil {
+		return false, lErr
+	}
+
+	return true, nil
+}
+
+func GoDeleteAccountAlias(myConfig aws.Config, myContext context.Context, aliasName string) (*iam.DeleteAccountAliasOutput, error) {
+	iamClient := iam.NewFromConfig(myConfig)
+	iamInput := &iam.DeleteAccountAliasInput{
+		AccountAlias: &aliasName,
+	}
+
+	return iamClient.DeleteAccountAlias(myContext, iamInput)
+
+}
+
+func DeleteAccountAlias(myConfig aws.Config, myContext context.Context, aliasName string) (bool, error) {
+
+	_, lErr := GoDeleteAccountAlias(myConfig, myContext, aliasName)
+	if lErr != nil {
+		return false, lErr
+	}
+
+	return true, nil
+}
+
+func GoListAccountAlias(myConfig aws.Config, myContext context.Context) (*iam.ListAccountAliasesOutput, error) {
+	iamClient := iam.NewFromConfig(myConfig)
+	iamInput := &iam.ListAccountAliasesInput{
+		MaxItems: aws.Int32(int32(10)),
+	}
+
+	return iamClient.ListAccountAliases(myContext, iamInput)
+
+	// aliasList := [:]
+
+	// for _, alias := range iamResp.AccountAliases {
+	// 	aliasList = append( aliasList, alias)
+	// }
+
+	//return iamClient.CreateAccountAlias(myContext, iamInput)
+
+}
+
+func GetAccountAliasList(myConfig aws.Config, myContext context.Context) (bool, error) {
+
+	_, lErr := GoListAccountAlias(myConfig, myContext)
 	if lErr != nil {
 		return false, lErr
 	}
