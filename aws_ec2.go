@@ -40,6 +40,76 @@ func DoEc2(myConfig aws.Config, myContext context.Context) {
 	log.Printf("Info: attached igw '%v' to VPC '%v'", igwId, vpcId)
 
 	//*******************************************************************************
+	snetId, isOk, isErr := CreateSubnetInVPC(myConfig, myContext, vpcId, "10.0.0.0/24")
+
+	if isErr != nil || !isOk {
+		log.Fatalf("Error: unable to create VPC: %v", isErr)
+	}
+
+	log.Printf("Info: subnet Id: '%v' is generated", snetId)
+
+	//*******************************************************************************
+	rtId, isOk, isErr := CreateRouteTableInVPC(myConfig, myContext, vpcId)
+
+	if isErr != nil || !isOk {
+		log.Fatalf("Error: unable to create route-table: %v", isErr)
+	}
+
+	log.Printf("Info: route-table Id: '%v' is generated", rtId)
+
+	//*******************************************************************************
+	ascId, isOk, isErr := AssociateRouteTableToSubnet(myConfig, myContext, rtId, snetId)
+
+	if isErr != nil || !isOk {
+		log.Fatalf("Error: unable to associate route-table '%v' to subnet '%v': %v", rtId, snetId, isErr)
+	}
+
+	log.Printf("Info: route-table Id: '%v' is associated to subnet '%v'", rtId, snetId)
+	log.Printf("Info: association Id: '%v'", ascId)
+
+	//*******************************************************************************
+	destCidrBlock := "1.2.3.4/32"
+	isOk, isErr = CreateRouteInRouteTable(myConfig, myContext, rtId, destCidrBlock, igwId)
+
+	if isErr != nil || !isOk {
+		log.Fatalf("Error: unable to add route '%v' in route-table '%v': %v", destCidrBlock, rtId, isErr)
+	}
+
+	log.Printf("Info: route '%v' is route-table '%v' is added.", destCidrBlock, rtId)
+
+	//*******************************************************************************
+	log.Println("Info: Sleep for 20 secs...deleting route in route-table")
+	time.Sleep(20 * time.Second)
+	isOk, isErr = DeleteRouteInRouteTable(myConfig, myContext, rtId, destCidrBlock)
+
+	if isErr != nil || !isOk {
+		log.Fatalf("Error: unable to delete route '%v' in route-table '%v': %v", destCidrBlock, rtId, isErr)
+	}
+
+	log.Printf("Info: route '%v' in route-table '%v' is deleted", destCidrBlock, rtId)
+
+	//*******************************************************************************
+	log.Println("Info: Sleep for 10 secs...disassociation of route table")
+	time.Sleep(10 * time.Second)
+	isOk, isErr = DisassociateRouteTableFromSubnet(myConfig, myContext, ascId)
+	if isErr != nil || !isOk {
+		log.Fatalf("Error: unable to disassociate route-table '%v': %v", rtId, isErr)
+	}
+
+	log.Printf("Info: route-table '%v' is disassociated", rtId)
+
+	//*******************************************************************************
+	log.Println("Info: Sleep for 10 secs...deleting routetable")
+	time.Sleep(10 * time.Second)
+	isOk, isErr = DeleteRouteTableInVPC(myConfig, myContext, rtId)
+
+	if isErr != nil || !isOk {
+		log.Fatalf("Error: unable to delete route-table '%v': %v", rtId, isErr)
+	}
+
+	log.Printf("Info: route-table Id: '%v' is deleted", rtId)
+
+	//*******************************************************************************
 	log.Println("Info: Sleep for 20 secs...")
 	time.Sleep(20 * time.Second)
 	isOk, isErr = DetachIgwFromVpc(myConfig, myContext, igwId, vpcId)
@@ -51,8 +121,8 @@ func DoEc2(myConfig aws.Config, myContext context.Context) {
 	log.Printf("Info: detached igw '%v' from VPC '%v'", igwId, vpcId)
 
 	//*******************************************************************************
-	log.Println("Info: Sleep for 20 secs...")
-	time.Sleep(20 * time.Second)
+	log.Println("Info: Sleep for 10 secs...")
+	time.Sleep(10 * time.Second)
 	isOk, isErr = DeleteIgw(myConfig, myContext, igwId)
 
 	if isErr != nil || !isOk {
@@ -62,8 +132,17 @@ func DoEc2(myConfig aws.Config, myContext context.Context) {
 	log.Printf("Info: deleted IGW Id: %v", igwId)
 
 	//*******************************************************************************
-	log.Println("Info: Sleep for 20 secs...")
-	time.Sleep(20 * time.Second)
+	isOk, isErr = DeleteSubnetInVPC(myConfig, myContext, snetId)
+
+	if isErr != nil || !isOk {
+		log.Fatalf("Error: unable to delete subnet '%v': %v", snetId, isErr)
+	}
+
+	log.Printf("Info: subnet '%v' is deleted", snetId)
+
+	//*******************************************************************************
+	log.Println("Info: Sleep for 10 secs...")
+	time.Sleep(10 * time.Second)
 
 	isOk, isErr = DeleteEc2VPC(myConfig, myContext, vpcId)
 	if isErr != nil || !isOk {
@@ -296,4 +375,257 @@ func DetachIgwFromVpc(myConfig aws.Config, myContext context.Context, igwId stri
 
 	return true, nil
 
+}
+
+func GoCreateSubnet(myConfig aws.Config, myContext context.Context, params *ec2.CreateSubnetInput) (*ec2.CreateSubnetOutput, error) {
+	ec2Client := ec2.NewFromConfig(myConfig)
+
+	if params == nil {
+		params = &ec2.CreateSubnetInput{}
+	}
+
+	ec2Resp, isErr := ec2Client.CreateSubnet(myContext, params)
+
+	if isErr != nil {
+		return nil, isErr
+	}
+
+	return ec2Resp, nil
+}
+
+func CreateSubnetInVPC(myConfig aws.Config, myContext context.Context, vpcId string, cidrBlock string) (string, bool, error) {
+
+	ec2Input := &ec2.CreateSubnetInput{
+		VpcId:     &vpcId,
+		CidrBlock: &cidrBlock,
+	}
+
+	outResp, isErr := GoCreateSubnet(myConfig, myContext, ec2Input)
+
+	if isErr != nil {
+		return "", false, isErr
+	}
+
+	return *outResp.Subnet.SubnetId, true, nil
+}
+
+func GoDeleteSubnet(myConfig aws.Config, myContext context.Context, params *ec2.DeleteSubnetInput) (*ec2.DeleteSubnetOutput, error) {
+	ec2Client := ec2.NewFromConfig(myConfig)
+
+	if params == nil {
+		params = &ec2.DeleteSubnetInput{}
+	}
+
+	ec2Resp, isErr := ec2Client.DeleteSubnet(myContext, params)
+
+	if isErr != nil {
+		return nil, isErr
+	}
+
+	return ec2Resp, nil
+}
+
+func DeleteSubnetInVPC(myConfig aws.Config, myContext context.Context, snetId string) (bool, error) {
+
+	ec2Input := &ec2.DeleteSubnetInput{
+		SubnetId: &snetId,
+	}
+
+	_, isErr := GoDeleteSubnet(myConfig, myContext, ec2Input)
+
+	if isErr != nil {
+		return false, isErr
+	}
+
+	return true, nil
+}
+
+func GoCreateRouteTable(myConfig aws.Config, myContext context.Context, params *ec2.CreateRouteTableInput) (*ec2.CreateRouteTableOutput, error) {
+	ec2Client := ec2.NewFromConfig(myConfig)
+
+	if params == nil {
+		params = &ec2.CreateRouteTableInput{}
+	}
+
+	ec2Resp, isErr := ec2Client.CreateRouteTable(myContext, params)
+
+	if isErr != nil {
+		return nil, isErr
+	}
+
+	return ec2Resp, nil
+}
+
+func CreateRouteTableInVPC(myConfig aws.Config, myContext context.Context, vpcId string) (string, bool, error) {
+
+	ec2Input := &ec2.CreateRouteTableInput{
+		VpcId: &vpcId,
+	}
+
+	outResp, isErr := GoCreateRouteTable(myConfig, myContext, ec2Input)
+
+	if isErr != nil {
+		return "", false, isErr
+	}
+
+	return *outResp.RouteTable.RouteTableId, true, nil
+}
+
+func GoCreateRoute(myConfig aws.Config, myContext context.Context, params *ec2.CreateRouteInput) (*ec2.CreateRouteOutput, error) {
+	ec2Client := ec2.NewFromConfig(myConfig)
+
+	if params == nil {
+		params = &ec2.CreateRouteInput{}
+	}
+
+	ec2Resp, isErr := ec2Client.CreateRoute(myContext, params)
+
+	if isErr != nil {
+		return nil, isErr
+	}
+
+	return ec2Resp, nil
+}
+
+func CreateRouteInRouteTable(myConfig aws.Config, myContext context.Context, rtId string, destCidrBlock string, igwId string) (bool, error) {
+
+	ec2Input := &ec2.CreateRouteInput{
+		RouteTableId:         &rtId,
+		DestinationCidrBlock: &destCidrBlock,
+		GatewayId:            &igwId,
+	}
+
+	_, isErr := GoCreateRoute(myConfig, myContext, ec2Input)
+
+	if isErr != nil {
+		return false, isErr
+	}
+
+	return true, nil
+}
+
+func GoDeleteRoute(myConfig aws.Config, myContext context.Context, params *ec2.DeleteRouteInput) (*ec2.DeleteRouteOutput, error) {
+	ec2Client := ec2.NewFromConfig(myConfig)
+
+	if params == nil {
+		params = &ec2.DeleteRouteInput{}
+	}
+
+	ec2Resp, isErr := ec2Client.DeleteRoute(myContext, params)
+
+	if isErr != nil {
+		return nil, isErr
+	}
+
+	return ec2Resp, nil
+}
+
+func DeleteRouteInRouteTable(myConfig aws.Config, myContext context.Context, rtId string, destCidrBlock string) (bool, error) {
+
+	ec2Input := &ec2.DeleteRouteInput{
+		RouteTableId:         &rtId,
+		DestinationCidrBlock: &destCidrBlock,
+	}
+
+	_, isErr := GoDeleteRoute(myConfig, myContext, ec2Input)
+
+	if isErr != nil {
+		return false, isErr
+	}
+
+	return true, nil
+}
+
+func GoDeleteRouteTable(myConfig aws.Config, myContext context.Context, params *ec2.DeleteRouteTableInput) (*ec2.DeleteRouteTableOutput, error) {
+	ec2Client := ec2.NewFromConfig(myConfig)
+
+	if params == nil {
+		params = &ec2.DeleteRouteTableInput{}
+	}
+
+	ec2Resp, isErr := ec2Client.DeleteRouteTable(myContext, params)
+
+	if isErr != nil {
+		return nil, isErr
+	}
+
+	return ec2Resp, nil
+}
+
+func DeleteRouteTableInVPC(myConfig aws.Config, myContext context.Context, rtId string) (bool, error) {
+
+	ec2Input := &ec2.DeleteRouteTableInput{
+		RouteTableId: &rtId,
+	}
+
+	_, isErr := GoDeleteRouteTable(myConfig, myContext, ec2Input)
+
+	if isErr != nil {
+		return false, isErr
+	}
+
+	return true, nil
+}
+
+func GoAssociateRouteTable(myConfig aws.Config, myContext context.Context, params *ec2.AssociateRouteTableInput) (*ec2.AssociateRouteTableOutput, error) {
+	ec2Client := ec2.NewFromConfig(myConfig)
+
+	if params == nil {
+		params = &ec2.AssociateRouteTableInput{}
+	}
+
+	ec2Resp, isErr := ec2Client.AssociateRouteTable(myContext, params)
+
+	if isErr != nil {
+		return nil, isErr
+	}
+
+	return ec2Resp, nil
+}
+
+func AssociateRouteTableToSubnet(myConfig aws.Config, myContext context.Context, rtId string, snetId string) (string, bool, error) {
+
+	ec2Input := &ec2.AssociateRouteTableInput{
+		RouteTableId: &rtId,
+		SubnetId:     &snetId,
+	}
+
+	outResp, isErr := GoAssociateRouteTable(myConfig, myContext, ec2Input)
+
+	if isErr != nil {
+		return "", false, isErr
+	}
+
+	return *outResp.AssociationId, true, nil
+}
+
+func GoDisassociateRouteTable(myConfig aws.Config, myContext context.Context, params *ec2.DisassociateRouteTableInput) (*ec2.DisassociateRouteTableOutput, error) {
+	ec2Client := ec2.NewFromConfig(myConfig)
+
+	if params == nil {
+		params = &ec2.DisassociateRouteTableInput{}
+	}
+
+	ec2Resp, isErr := ec2Client.DisassociateRouteTable(myContext, params)
+
+	if isErr != nil {
+		return nil, isErr
+	}
+
+	return ec2Resp, nil
+}
+
+func DisassociateRouteTableFromSubnet(myConfig aws.Config, myContext context.Context, ascId string) (bool, error) {
+
+	ec2Input := &ec2.DisassociateRouteTableInput{
+		AssociationId: &ascId,
+	}
+
+	_, isErr := GoDisassociateRouteTable(myConfig, myContext, ec2Input)
+
+	if isErr != nil {
+		return false, isErr
+	}
+
+	return true, nil
 }
