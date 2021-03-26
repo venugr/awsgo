@@ -21,5 +21,6 @@ func main() {
 	//DoUser(myConfig, myContext)
 	// DoPolicy(myConfig, myContext)
 	DoEc2(myConfig, myContext)
+	// DoEip(myConfig, myContext)
 	fmt.Println()
 }

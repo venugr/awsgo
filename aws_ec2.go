@@ -10,6 +10,30 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 )
 
+func DoEip(myConfig aws.Config, myContext context.Context) {
+
+	//*******************************************************************************
+	allcId, pubIp, isOk, isErr := AllocateEip(myConfig, myContext)
+
+	if isErr != nil || !isOk {
+		log.Fatalf("Error: unable to allocate EIP: %v", isErr)
+	}
+
+	log.Printf("Info: allocated IP '%v' id '%v'", pubIp, allcId)
+
+	//*******************************************************************************
+	log.Println("Info: Sleep for 20 secs...releasing public ip allocation")
+	time.Sleep(20 * time.Second)
+	isOk, isErr = ReleaseEip(myConfig, myContext, allcId)
+
+	if isErr != nil || !isOk {
+		log.Fatalf("Error: unable to Release EIP '%v(%v)': %v", pubIp, allcId, isErr)
+	}
+
+	log.Printf("Info: released allocated IP '%v' id '%v'", pubIp, allcId)
+
+}
+
 func DoEc2(myConfig aws.Config, myContext context.Context) {
 
 	//*******************************************************************************
@@ -76,6 +100,46 @@ func DoEc2(myConfig aws.Config, myContext context.Context) {
 	}
 
 	log.Printf("Info: route '%v' is route-table '%v' is added.", destCidrBlock, rtId)
+
+	//*******************************************************************************
+	allcId, pubIp, isOk, isErr := AllocateEip(myConfig, myContext)
+
+	if isErr != nil || !isOk {
+		log.Fatalf("Error: unable to allocate EIP: %v", isErr)
+	}
+
+	log.Printf("Info: allocated IP '%v' id '%v'", pubIp, allcId)
+
+	//*******************************************************************************
+	ngwId, isOk, isErr := CreateNatGatewayInSubnet(myConfig, myContext, allcId, snetId)
+
+	if isErr != nil || !isOk {
+		log.Fatalf("Error: unable to create NatGateway: %v", isErr)
+	}
+
+	log.Printf("Info: NAT gateway '%v' is created.", ngwId)
+
+	//*******************************************************************************
+	log.Println("Info: Sleep for 20 secs...deleting nat gateway")
+	time.Sleep(20 * time.Second)
+	isOk, isErr = DeleteNatGatewayInSubnet(myConfig, myContext, ngwId)
+
+	if isErr != nil || !isOk {
+		log.Fatalf("Error: unable to create NatGateway: %v", isErr)
+	}
+
+	log.Printf("Info: NAT gateway '%v' is created.", ngwId)
+
+	//*******************************************************************************
+	log.Println("Info: Sleep for 20 secs...releasing public ip allocation")
+	time.Sleep(20 * time.Second)
+	isOk, isErr = ReleaseEip(myConfig, myContext, allcId)
+
+	if isErr != nil || !isOk {
+		log.Fatalf("Error: unable to Release EIP '%v(%v)': %v", pubIp, allcId, isErr)
+	}
+
+	log.Printf("Info: released allocated IP '%v' id '%v'", pubIp, allcId)
 
 	//*******************************************************************************
 	log.Println("Info: Sleep for 20 secs...deleting route in route-table")
@@ -622,6 +686,129 @@ func DisassociateRouteTableFromSubnet(myConfig aws.Config, myContext context.Con
 	}
 
 	_, isErr := GoDisassociateRouteTable(myConfig, myContext, ec2Input)
+
+	if isErr != nil {
+		return false, isErr
+	}
+
+	return true, nil
+}
+
+func GoAllocateAddress(myConfig aws.Config, myContext context.Context, params *ec2.AllocateAddressInput) (*ec2.AllocateAddressOutput, error) {
+	ec2Client := ec2.NewFromConfig(myConfig)
+
+	if params == nil {
+		params = &ec2.AllocateAddressInput{}
+	}
+
+	ec2Resp, isErr := ec2Client.AllocateAddress(myContext, params)
+
+	if isErr != nil {
+		return nil, isErr
+	}
+
+	return ec2Resp, nil
+}
+
+func AllocateEip(myConfig aws.Config, myContext context.Context) (string, string, bool, error) {
+
+	ec2Input := &ec2.AllocateAddressInput{}
+
+	outResp, isErr := GoAllocateAddress(myConfig, myContext, ec2Input)
+
+	if isErr != nil {
+		return "", "", false, isErr
+	}
+
+	return *outResp.AllocationId, *outResp.PublicIp, true, nil
+}
+
+func GoReleaseAddress(myConfig aws.Config, myContext context.Context, params *ec2.ReleaseAddressInput) (*ec2.ReleaseAddressOutput, error) {
+	ec2Client := ec2.NewFromConfig(myConfig)
+
+	if params == nil {
+		params = &ec2.ReleaseAddressInput{}
+	}
+
+	ec2Resp, isErr := ec2Client.ReleaseAddress(myContext, params)
+
+	if isErr != nil {
+		return nil, isErr
+	}
+
+	return ec2Resp, nil
+}
+
+func ReleaseEip(myConfig aws.Config, myContext context.Context, allcId string) (bool, error) {
+
+	ec2Input := &ec2.ReleaseAddressInput{
+		AllocationId: &allcId,
+	}
+
+	_, isErr := GoReleaseAddress(myConfig, myContext, ec2Input)
+
+	if isErr != nil {
+		return false, isErr
+	}
+
+	return true, nil
+}
+
+func GoCreateNatGateway(myConfig aws.Config, myContext context.Context, params *ec2.CreateNatGatewayInput) (*ec2.CreateNatGatewayOutput, error) {
+	ec2Client := ec2.NewFromConfig(myConfig)
+
+	if params == nil {
+		params = &ec2.CreateNatGatewayInput{}
+	}
+
+	ec2Resp, isErr := ec2Client.CreateNatGateway(myContext, params)
+
+	if isErr != nil {
+		return nil, isErr
+	}
+
+	return ec2Resp, nil
+}
+
+func CreateNatGatewayInSubnet(myConfig aws.Config, myContext context.Context, allcId string, snetId string) (string, bool, error) {
+
+	ec2Input := &ec2.CreateNatGatewayInput{
+		AllocationId: &allcId,
+		SubnetId:     &snetId,
+	}
+
+	outResp, isErr := GoCreateNatGateway(myConfig, myContext, ec2Input)
+
+	if isErr != nil {
+		return "", false, isErr
+	}
+
+	return *outResp.NatGateway.NatGatewayId, true, nil
+}
+
+func GoDeleteNatGateway(myConfig aws.Config, myContext context.Context, params *ec2.DeleteNatGatewayInput) (*ec2.DeleteNatGatewayOutput, error) {
+	ec2Client := ec2.NewFromConfig(myConfig)
+
+	if params == nil {
+		params = &ec2.DeleteNatGatewayInput{}
+	}
+
+	ec2Resp, isErr := ec2Client.DeleteNatGateway(myContext, params)
+
+	if isErr != nil {
+		return nil, isErr
+	}
+
+	return ec2Resp, nil
+}
+
+func DeleteNatGatewayInSubnet(myConfig aws.Config, myContext context.Context, ngwId string) (bool, error) {
+
+	ec2Input := &ec2.DeleteNatGatewayInput{
+		NatGatewayId: &ngwId,
+	}
+
+	_, isErr := GoDeleteNatGateway(myConfig, myContext, ec2Input)
 
 	if isErr != nil {
 		return false, isErr
