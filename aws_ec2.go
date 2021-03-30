@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"log"
-	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
@@ -22,8 +21,9 @@ func DoEip(myConfig aws.Config, myContext context.Context) {
 	log.Printf("Info: allocated IP '%v' id '%v'", pubIp, allcId)
 
 	//*******************************************************************************
-	log.Println("Info: Sleep for 20 secs...releasing public ip allocation")
-	time.Sleep(20 * time.Second)
+	// log.Println("Info: Sleep for 20 secs...releasing public ip allocation")
+	// time.Sleep(20 * time.Second)
+	DoSleep(20, "releasing public ip allocation")
 	isOk, isErr = ReleaseEip(myConfig, myContext, allcId)
 
 	if isErr != nil || !isOk {
@@ -35,6 +35,72 @@ func DoEip(myConfig aws.Config, myContext context.Context) {
 }
 
 func DoEc2(myConfig aws.Config, myContext context.Context) {
+	//*******************************************************************************
+	vpcId, isOk, isErr := CreateEc2VPC(myConfig, myContext)
+
+	if isErr != nil || !isOk {
+		log.Fatalf("Error: unable to create VPC: %v", isErr)
+	}
+
+	log.Printf("Info: VPC Id: %v", vpcId)
+
+	//*******************************************************************************
+	sgId, isOk, isErr := DoCreateSecurityGroup(myConfig, myContext, vpcId, "TestGroup AWS SDK GO-V2", "testgroup")
+
+	if isErr != nil || !isOk {
+		log.Fatalf("Error: unable to create security group: %v", isErr)
+	}
+
+	log.Printf("Info: Sg Id '%v' is created.", sgId)
+	DoSleep(10, "check security group.")
+
+	//*******************************************************************************
+	cidrIp := "149.24.0.0/16"
+	toPort := int32(22)
+	protocallName := "tcp"
+	fromPort := int32(22)
+	isOk, isErr = DoAuthorizeSecurityGroupIngress(myConfig, myContext, sgId, cidrIp, fromPort, toPort, protocallName)
+	if isErr != nil || !isOk {
+		log.Printf("Error: unable to add ingress '%v' to  security group '%v': %v", cidrIp, sgId, isErr)
+	}
+
+	log.Printf("Info: Ingress '%v' is added to sgid '%v'.", cidrIp, sgId)
+	DoSleep(20, "Check Ingress entry")
+
+	//*******************************************************************************
+	isOk, isErr = DoRevokeSecurityGroupIngress(myConfig, myContext, sgId, cidrIp, fromPort, toPort, protocallName)
+	if isErr != nil || !isOk {
+		log.Printf("Error: unable to revoke ingress '%v' from  security group '%v': %v", cidrIp, sgId, isErr)
+	}
+
+	log.Printf("Info: Ingress '%v' is revoked from sgid '%v'.", cidrIp, sgId)
+	DoSleep(20, "Check Ingress entry")
+
+	//*******************************************************************************
+
+	isOk, isErr = DoDeleteSecurityGroupById(myConfig, myContext, sgId)
+
+	if isErr != nil || !isOk {
+		log.Fatalf("Error: unable to delete security group: %v", isErr)
+	}
+
+	log.Printf("Info: SG Id '%v' is deleted.", sgId)
+
+	//*******************************************************************************
+	// log.Println("Info: Sleep for 10 secs...")
+	// time.Sleep(10 * time.Second)
+	DoSleep(10, "")
+
+	isOk, isErr = DeleteEc2VPC(myConfig, myContext, vpcId)
+	if isErr != nil || !isOk {
+		log.Fatalf("Error: unable to delete VPC'%v': %v", vpcId, isErr)
+	}
+
+	log.Printf("Info: VPC '%v' is deleted.", vpcId)
+
+}
+
+func DoEc2Old(myConfig aws.Config, myContext context.Context) {
 
 	//*******************************************************************************
 	vpcId, isOk, isErr := CreateEc2VPC(myConfig, myContext)
@@ -120,8 +186,74 @@ func DoEc2(myConfig aws.Config, myContext context.Context) {
 	log.Printf("Info: NAT gateway '%v' is created.", ngwId)
 
 	//*******************************************************************************
-	log.Println("Info: Sleep for 20 secs...deleting nat gateway")
-	time.Sleep(20 * time.Second)
+	// instId, isOk, isErr := DoEc2Instances(myConfig, myContext)
+
+	// if isErr != nil || !isOk {
+	// 	log.Fatalf("Error: unable to create NatGateway: %v", isErr)
+	// }
+
+	// log.Printf("Info: Instance Id '%v' is created.", instId)
+	// DoSleep(60)
+
+	//*******************************************************************************
+	sgId, isOk, isErr := DoCreateSecurityGroup(myConfig, myContext, vpcId, "TestGroup AWS SDK GO-V2", "testgroup")
+
+	if isErr != nil || !isOk {
+		log.Fatalf("Error: unable to create security group: %v", isErr)
+	}
+
+	log.Printf("Info: Sg Id '%v' is created.", sgId)
+	DoSleep(10, "check security group.")
+
+	//*******************************************************************************
+	cidrIp := "149.24.0.0/16"
+	toPort := int32(22)
+	fromPort := int32(-1)
+	isOk, isErr = DoAuthorizeSecurityGroupIngress(myConfig, myContext, sgId, cidrIp, fromPort, toPort, "tcp")
+	if isErr != nil || !isOk {
+		log.Fatalf("Error: unable to add ingress '%v' to  security group '%v': %v", cidrIp, sgId, isErr)
+	}
+
+	log.Printf("Info: Ingress '%v' is added to sgid '%v'.", cidrIp, sgId)
+	DoSleep(20, "Check Ingress entry")
+
+	//*******************************************************************************
+	grpName := "testgroup1"
+	tsgId, isOk, isErr := DoCreateSecurityGroup(myConfig, myContext, vpcId, "TestGroup AWS SDK GO-V2", grpName)
+
+	if isErr != nil || !isOk {
+		log.Fatalf("Error: unable to create security group: %v", isErr)
+	}
+
+	log.Printf("Info: Sg Id '%v' is created.", tsgId)
+	DoSleep(10, "")
+
+	//*******************************************************************************
+
+	isOk, isErr = DoDeleteSecurityGroupById(myConfig, myContext, tsgId)
+
+	if isErr != nil || !isOk {
+		log.Fatalf("Error: unable to delete security group: %v", isErr)
+	}
+
+	log.Printf("Info: Sg name '%v' is deleted.", grpName)
+	DoSleep(10, "")
+
+	//*******************************************************************************
+	isOk, isErr = DoDeleteSecurityGroupById(myConfig, myContext, sgId)
+
+	if isErr != nil || !isOk {
+		log.Fatalf("Error: unable to delete security group: %v", isErr)
+	}
+
+	log.Printf("Info: Sg Id '%v' is deleted.", sgId)
+	DoSleep(10, "")
+
+	//*******************************************************************************
+	// log.Println("Info: Sleep for 20 secs...deleting nat gateway")
+	// time.Sleep(20 * time.Second)
+	DoSleep(20, "deleting nat gateway")
+
 	isOk, isErr = DeleteNatGatewayInSubnet(myConfig, myContext, ngwId)
 
 	if isErr != nil || !isOk {
@@ -131,8 +263,10 @@ func DoEc2(myConfig aws.Config, myContext context.Context) {
 	log.Printf("Info: NAT gateway '%v' is created.", ngwId)
 
 	//*******************************************************************************
-	log.Println("Info: Sleep for 20 secs...releasing public ip allocation")
-	time.Sleep(20 * time.Second)
+	// log.Println("Info: Sleep for 20 secs...releasing public ip allocation")
+	// time.Sleep(20 * time.Second)
+	DoSleep(20, "deleting nat gateway")
+
 	isOk, isErr = ReleaseEip(myConfig, myContext, allcId)
 
 	if isErr != nil || !isOk {
@@ -142,8 +276,10 @@ func DoEc2(myConfig aws.Config, myContext context.Context) {
 	log.Printf("Info: released allocated IP '%v' id '%v'", pubIp, allcId)
 
 	//*******************************************************************************
-	log.Println("Info: Sleep for 20 secs...deleting route in route-table")
-	time.Sleep(20 * time.Second)
+	// log.Println("Info: Sleep for 20 secs...deleting route in route-table")
+	// time.Sleep(20 * time.Second)
+	DoSleep(10, "deleting route in route-table")
+
 	isOk, isErr = DeleteRouteInRouteTable(myConfig, myContext, rtId, destCidrBlock)
 
 	if isErr != nil || !isOk {
@@ -153,8 +289,10 @@ func DoEc2(myConfig aws.Config, myContext context.Context) {
 	log.Printf("Info: route '%v' in route-table '%v' is deleted", destCidrBlock, rtId)
 
 	//*******************************************************************************
-	log.Println("Info: Sleep for 10 secs...disassociation of route table")
-	time.Sleep(10 * time.Second)
+	// log.Println("Info: Sleep for 10 secs...disassociation of route table")
+	// time.Sleep(10 * time.Second)
+	DoSleep(10, "disassociation of route table")
+
 	isOk, isErr = DisassociateRouteTableFromSubnet(myConfig, myContext, ascId)
 	if isErr != nil || !isOk {
 		log.Fatalf("Error: unable to disassociate route-table '%v': %v", rtId, isErr)
@@ -163,8 +301,9 @@ func DoEc2(myConfig aws.Config, myContext context.Context) {
 	log.Printf("Info: route-table '%v' is disassociated", rtId)
 
 	//*******************************************************************************
-	log.Println("Info: Sleep for 10 secs...deleting routetable")
-	time.Sleep(10 * time.Second)
+	// log.Println("Info: Sleep for 10 secs...deleting routetable")
+	// time.Sleep(10 * time.Second)
+	DoSleep(10, "deleting routetable")
 	isOk, isErr = DeleteRouteTableInVPC(myConfig, myContext, rtId)
 
 	if isErr != nil || !isOk {
@@ -174,8 +313,10 @@ func DoEc2(myConfig aws.Config, myContext context.Context) {
 	log.Printf("Info: route-table Id: '%v' is deleted", rtId)
 
 	//*******************************************************************************
-	log.Println("Info: Sleep for 20 secs...")
-	time.Sleep(20 * time.Second)
+	// log.Println("Info: Sleep for 20 secs...")
+	// time.Sleep(20 * time.Second)
+	DoSleep(10, "")
+
 	isOk, isErr = DetachIgwFromVpc(myConfig, myContext, igwId, vpcId)
 
 	if isErr != nil || !isOk {
@@ -185,8 +326,10 @@ func DoEc2(myConfig aws.Config, myContext context.Context) {
 	log.Printf("Info: detached igw '%v' from VPC '%v'", igwId, vpcId)
 
 	//*******************************************************************************
-	log.Println("Info: Sleep for 10 secs...")
-	time.Sleep(10 * time.Second)
+	// log.Println("Info: Sleep for 10 secs...")
+	// time.Sleep(10 * time.Second)
+	DoSleep(10, "")
+
 	isOk, isErr = DeleteIgw(myConfig, myContext, igwId)
 
 	if isErr != nil || !isOk {
@@ -205,8 +348,9 @@ func DoEc2(myConfig aws.Config, myContext context.Context) {
 	log.Printf("Info: subnet '%v' is deleted", snetId)
 
 	//*******************************************************************************
-	log.Println("Info: Sleep for 10 secs...")
-	time.Sleep(10 * time.Second)
+	// log.Println("Info: Sleep for 10 secs...")
+	// time.Sleep(10 * time.Second)
+	DoSleep(10, "")
 
 	isOk, isErr = DeleteEc2VPC(myConfig, myContext, vpcId)
 	if isErr != nil || !isOk {
