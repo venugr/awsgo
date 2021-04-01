@@ -45,6 +45,55 @@ func DoEc2(myConfig aws.Config, myContext context.Context) {
 	log.Printf("Info: VPC Id: %v", vpcId)
 
 	//*******************************************************************************
+	keyName := "testkeypair"
+	keyId, keyFingerPrint, keyPem, isOk, isErr := DoCreateKeyPair(myConfig, myContext, keyName)
+
+	if isErr != nil || !isOk {
+		log.Fatalf("Error: unable to cretae key-pair: %v", isErr)
+	}
+
+	log.Printf("Info: keypair '%v' is created, id: %v", keyName, keyId)
+
+	log.Printf("Info: KeyFingerPrint:\n%v", keyFingerPrint)
+	log.Printf("Info: KeyPem:\n%v", keyPem)
+
+	DoSleep(20, "check keypair...")
+
+	//*******************************************************************************
+
+	isOk, isErr = DoDeleteKeyPair(myConfig, myContext, keyId)
+
+	if isErr != nil || !isOk {
+		log.Fatalf("Error: unable to delete key-pair: %v", isErr)
+	}
+
+	log.Printf("Info: keypair '%v' is deleted, id: %v", keyName, keyId)
+
+	DoSleep(10, "check keypair deleted...")
+
+	//*******************************************************************************
+	// log.Println("Info: Sleep for 10 secs...")
+	// time.Sleep(10 * time.Second)
+	isOk, isErr = DeleteEc2VPC(myConfig, myContext, vpcId)
+	if isErr != nil || !isOk {
+		log.Fatalf("Error: unable to delete VPC'%v': %v", vpcId, isErr)
+	}
+
+	log.Printf("Info: VPC '%v' is deleted.", vpcId)
+
+}
+
+func DoEc2_1(myConfig aws.Config, myContext context.Context) {
+	//*******************************************************************************
+	vpcId, isOk, isErr := CreateEc2VPC(myConfig, myContext)
+
+	if isErr != nil || !isOk {
+		log.Fatalf("Error: unable to create VPC: %v", isErr)
+	}
+
+	log.Printf("Info: VPC Id: %v", vpcId)
+
+	//*******************************************************************************
 	sgId, isOk, isErr := DoCreateSecurityGroup(myConfig, myContext, vpcId, "TestGroup AWS SDK GO-V2", "testgroup")
 
 	if isErr != nil || !isOk {

@@ -223,3 +223,69 @@ func DoRevokeSecurityGroupIngress(myConfig aws.Config, myContext context.Context
 
 	return true, nil
 }
+
+func GoCreateKeyPair(myConfig aws.Config, myContext context.Context, params *ec2.CreateKeyPairInput) (*ec2.CreateKeyPairOutput, error) {
+
+	ec2Client := ec2.NewFromConfig(myConfig)
+
+	if params == nil {
+		params = &ec2.CreateKeyPairInput{}
+	}
+
+	ec2Resp, isErr := ec2Client.CreateKeyPair(myContext, params)
+
+	if isErr != nil {
+		return nil, isErr
+	}
+
+	return ec2Resp, nil
+
+}
+
+func DoCreateKeyPair(myConfig aws.Config, myContext context.Context, keyName string) (string, string, string, bool, error) {
+
+	ec2Input := &ec2.CreateKeyPairInput{
+		KeyName: &keyName,
+	}
+
+	outResp, isErr := GoCreateKeyPair(myConfig, myContext, ec2Input)
+
+	if isErr != nil {
+		return "", "", "", false, isErr
+	}
+
+	return *outResp.KeyPairId, *outResp.KeyFingerprint, *outResp.KeyMaterial, true, nil
+}
+
+func GoDeleteKeyPair(myConfig aws.Config, myContext context.Context, params *ec2.DeleteKeyPairInput) (*ec2.DeleteKeyPairOutput, error) {
+
+	ec2Client := ec2.NewFromConfig(myConfig)
+
+	if params == nil {
+		params = &ec2.DeleteKeyPairInput{}
+	}
+
+	ec2Resp, isErr := ec2Client.DeleteKeyPair(myContext, params)
+
+	if isErr != nil {
+		return nil, isErr
+	}
+
+	return ec2Resp, nil
+
+}
+
+func DoDeleteKeyPair(myConfig aws.Config, myContext context.Context, keyId string) (bool, error) {
+
+	ec2Input := &ec2.DeleteKeyPairInput{
+		KeyPairId: &keyId,
+	}
+
+	_, isErr := GoDeleteKeyPair(myConfig, myContext, ec2Input)
+
+	if isErr != nil {
+		return false, isErr
+	}
+
+	return true, nil
+}
