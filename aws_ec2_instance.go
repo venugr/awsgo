@@ -289,3 +289,175 @@ func DoDeleteKeyPair(myConfig aws.Config, myContext context.Context, keyId strin
 
 	return true, nil
 }
+
+func GoCreateVolume(myConfig aws.Config, myContext context.Context, params *ec2.CreateVolumeInput) (*ec2.CreateVolumeOutput, error) {
+
+	ec2Client := ec2.NewFromConfig(myConfig)
+
+	if params == nil {
+		params = &ec2.CreateVolumeInput{}
+	}
+
+	ec2Resp, isErr := ec2Client.CreateVolume(myContext, params)
+
+	if isErr != nil {
+		return nil, isErr
+	}
+
+	return ec2Resp, nil
+
+}
+
+func DoCreateVolume(myConfig aws.Config, myContext context.Context, avlZone string, size int32) (string, bool, error) {
+
+	ec2Input := &ec2.CreateVolumeInput{
+		AvailabilityZone: &avlZone,
+		Size:             size,
+	}
+
+	outResp, isErr := GoCreateVolume(myConfig, myContext, ec2Input)
+
+	if isErr != nil {
+		return "", false, isErr
+	}
+
+	return *outResp.VolumeId, true, nil
+}
+
+func GoDeleteVolume(myConfig aws.Config, myContext context.Context, params *ec2.DeleteVolumeInput) (*ec2.DeleteVolumeOutput, error) {
+
+	ec2Client := ec2.NewFromConfig(myConfig)
+
+	if params == nil {
+		params = &ec2.DeleteVolumeInput{}
+	}
+
+	ec2Resp, isErr := ec2Client.DeleteVolume(myContext, params)
+
+	if isErr != nil {
+		return nil, isErr
+	}
+
+	return ec2Resp, nil
+
+}
+
+func DoDeleteVolume(myConfig aws.Config, myContext context.Context, volId string) (bool, error) {
+
+	ec2Input := &ec2.DeleteVolumeInput{
+		VolumeId: &volId,
+	}
+
+	_, isErr := GoDeleteVolume(myConfig, myContext, ec2Input)
+
+	if isErr != nil {
+		return false, isErr
+	}
+
+	return true, nil
+}
+
+func GoCreateSnapshot(myConfig aws.Config, myContext context.Context, params *ec2.CreateSnapshotInput) (*ec2.CreateSnapshotOutput, error) {
+
+	ec2Client := ec2.NewFromConfig(myConfig)
+
+	if params == nil {
+		params = &ec2.CreateSnapshotInput{}
+	}
+
+	ec2Resp, isErr := ec2Client.CreateSnapshot(myContext, params)
+
+	if isErr != nil {
+		return nil, isErr
+	}
+
+	return ec2Resp, nil
+
+}
+
+func DoCreateSnapshot(myConfig aws.Config, myContext context.Context, volId string) (string, bool, error) {
+
+	ec2Input := &ec2.CreateSnapshotInput{
+		VolumeId: &volId,
+	}
+
+	outResp, isErr := GoCreateSnapshot(myConfig, myContext, ec2Input)
+
+	if isErr != nil {
+		return "", false, isErr
+	}
+
+	return *outResp.SnapshotId, true, nil
+}
+
+func GoDeleteSnapshot(myConfig aws.Config, myContext context.Context, params *ec2.DeleteSnapshotInput) (*ec2.DeleteSnapshotOutput, error) {
+
+	ec2Client := ec2.NewFromConfig(myConfig)
+
+	if params == nil {
+		params = &ec2.DeleteSnapshotInput{}
+	}
+
+	ec2Resp, isErr := ec2Client.DeleteSnapshot(myContext, params)
+
+	if isErr != nil {
+		return nil, isErr
+	}
+
+	return ec2Resp, nil
+
+}
+
+func DoDeleteSnapshot(myConfig aws.Config, myContext context.Context, snapId string) (bool, error) {
+
+	ec2Input := &ec2.DeleteSnapshotInput{
+		SnapshotId: &snapId,
+	}
+
+	_, isErr := GoDeleteSnapshot(myConfig, myContext, ec2Input)
+
+	if isErr != nil {
+		return false, isErr
+	}
+
+	return true, nil
+}
+
+func GoDescribeVolumes(myConfig aws.Config, myContext context.Context, params *ec2.DescribeVolumesInput) (*ec2.DescribeVolumesOutput, error) {
+
+	ec2Client := ec2.NewFromConfig(myConfig)
+
+	if params == nil {
+		params = &ec2.DescribeVolumesInput{}
+	}
+
+	ec2Resp, isErr := ec2Client.DescribeVolumes(myContext, params)
+
+	if isErr != nil {
+		return nil, isErr
+	}
+
+	return ec2Resp, nil
+
+}
+
+func DoDescribeVolumeStatus(myConfig aws.Config, myContext context.Context, volId string) (string, bool, error) {
+
+	ec2Input := &ec2.DescribeVolumesInput{}
+
+	outResp, isErr := GoDescribeVolumes(myConfig, myContext, ec2Input)
+
+	if isErr != nil {
+		return "", false, isErr
+	}
+
+	volStatus := ""
+
+	for _, volume := range outResp.Volumes {
+
+		if volId == *volume.VolumeId {
+			volStatus = string(volume.State)
+		}
+	}
+	return volStatus, true, nil
+}

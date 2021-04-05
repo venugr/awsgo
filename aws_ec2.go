@@ -36,6 +36,62 @@ func DoEip(myConfig aws.Config, myContext context.Context) {
 
 func DoEc2(myConfig aws.Config, myContext context.Context) {
 	//*******************************************************************************
+	avlZone := "us-east-1a"
+	volSize := int32(8)
+	volId, isOk, isErr := DoCreateVolume(myConfig, myContext, avlZone, volSize)
+
+	if isErr != nil || !isOk {
+		log.Fatalf("Error: unable to create volume: %v", isErr)
+	}
+
+	log.Printf("Info: Volume Id '%v' is created", volId)
+
+	for true {
+		volStatus, isOk, isErr := DoDescribeVolumeStatus(myConfig, myContext, volId)
+		if isErr != nil || !isOk {
+			log.Fatalf("Error: unable to create snapshot: %v", isErr)
+		}
+
+		log.Printf("Info: Voloue '%v' status '%v'", volId, volStatus)
+		if volStatus == "available" {
+			break
+		}
+
+		DoSleep(2, "volume not available...")
+	}
+
+	snpId, isOk, isErr := DoCreateSnapshot(myConfig, myContext, volId)
+
+	if isErr != nil || !isOk {
+		log.Fatalf("Error: unable to create snapshot: %v", isErr)
+	}
+
+	log.Printf("Info: Snapshot Id '%v' is created", snpId)
+
+	DoSleep(20, "deleting snapshot...")
+
+	isOk, isErr = DoDeleteSnapshot(myConfig, myContext, snpId)
+
+	if isErr != nil || !isOk {
+		log.Fatalf("Error: unable to delete snapshot: %v", isErr)
+	}
+
+	log.Printf("Info: Snapshot Id '%v' is deleted", snpId)
+
+	DoSleep(20, "deleting volume...")
+
+	isOk, isErr = DoDeleteVolume(myConfig, myContext, volId)
+
+	if isErr != nil || !isOk {
+		log.Fatalf("Error: unable to delete volume: %v", isErr)
+	}
+
+	log.Printf("Info: Volume Id: %v deleted", volId)
+
+}
+
+func DoEc2_2(myConfig aws.Config, myContext context.Context) {
+	//*******************************************************************************
 	vpcId, isOk, isErr := CreateEc2VPC(myConfig, myContext)
 
 	if isErr != nil || !isOk {
