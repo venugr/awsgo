@@ -20,7 +20,8 @@ func main() {
 
 	//DoUser(myConfig, myContext)
 	// DoPolicy(myConfig, myContext)
-	DoEc2(myConfig, myContext)
+	//DoEc2(myConfig, myContext)
+	DoS3(myConfig, myContext)
 	// DoEip(myConfig, myContext)
 	fmt.Println()
 }

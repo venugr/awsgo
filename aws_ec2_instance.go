@@ -390,6 +390,41 @@ func DoCreateSnapshot(myConfig aws.Config, myContext context.Context, volId stri
 	return *outResp.SnapshotId, true, nil
 }
 
+func GoCopySnapshot(myConfig aws.Config, myContext context.Context, params *ec2.CopySnapshotInput) (*ec2.CopySnapshotOutput, error) {
+
+	ec2Client := ec2.NewFromConfig(myConfig)
+
+	if params == nil {
+		params = &ec2.CopySnapshotInput{}
+	}
+
+	ec2Resp, isErr := ec2Client.CopySnapshot(myContext, params)
+
+	if isErr != nil {
+		return nil, isErr
+	}
+
+	return ec2Resp, nil
+
+}
+
+func DoCopySnapshot(myConfig aws.Config, myContext context.Context, srcRegion string, destRegion string, srcSnapId string, desc string) (string, bool, error) {
+
+	ec2Input := &ec2.CopySnapshotInput{
+		SourceRegion:     &srcRegion,
+		SourceSnapshotId: &srcSnapId,
+		Description:      &desc,
+	}
+
+	outResp, isErr := GoCopySnapshot(myConfig, myContext, ec2Input)
+
+	if isErr != nil {
+		return "", false, isErr
+	}
+
+	return *outResp.SnapshotId, true, nil
+}
+
 func GoDeleteSnapshot(myConfig aws.Config, myContext context.Context, params *ec2.DeleteSnapshotInput) (*ec2.DeleteSnapshotOutput, error) {
 
 	ec2Client := ec2.NewFromConfig(myConfig)

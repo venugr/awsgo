@@ -68,6 +68,23 @@ func DoEc2(myConfig aws.Config, myContext context.Context) {
 
 	log.Printf("Info: Snapshot Id '%v' is created", snpId)
 
+	cpysnpId, isOk, isErr := DoCopySnapshot(myConfig, myContext, "us-east-1", "us-west-2", snpId, "TestCopy Snapshot")
+
+	if isErr != nil || !isOk {
+		log.Fatalf("Error: unable to copy snapshot: %v", isErr)
+	}
+
+	log.Printf("Info: Snapshot Id '%v' is copy", cpysnpId)
+	DoSleep(20, "deleting snapshot...")
+
+	isOk, isErr = DoDeleteSnapshot(myConfig, myContext, cpysnpId)
+
+	if isErr != nil || !isOk {
+		log.Fatalf("Error: unable to delete snapshot: %v", isErr)
+	}
+
+	log.Printf("Info: Snapshot Id '%v' is deleted", cpysnpId)
+
 	DoSleep(20, "deleting snapshot...")
 
 	isOk, isErr = DoDeleteSnapshot(myConfig, myContext, snpId)
